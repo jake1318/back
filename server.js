@@ -1,6 +1,6 @@
 /**
  * @file server.js
- * Updated Date: 2025-01-26
+ * Updated Date: 2025-01-30
  */
 
 import express from "express";
@@ -13,30 +13,25 @@ import axios from "axios";
 import rateLimit from "express-rate-limit";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import path from "path";
 
 // Configure __dirname equivalent for ES modules
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Load environment variables
-dotenv.config();
+// Load environment variables (ensures `.env` file is read correctly)
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
-// Validate environment variables
+// Validate required environment variables
 if (!process.env.OPENAI_API_KEY) {
-  console.error("Error: OPENAI_API_KEY is not set.");
+  console.error("❌ Error: OPENAI_API_KEY is not set.");
   process.exit(1);
 }
 
 if (!process.env.YOUTUBE_API_KEY) {
   console.warn(
-    "Warning: YOUTUBE_API_KEY is not set. YouTube results will be disabled."
+    "⚠️ Warning: YOUTUBE_API_KEY is not set. YouTube results will be disabled."
   );
 }
-
-// Handle uncaught exceptions
-process.on("uncaughtException", (error) => {
-  console.error("Uncaught Exception:", error);
-  // Log but don't exit
-});
 
 const app = express();
 
@@ -54,8 +49,8 @@ const limiter = rateLimit({
 });
 app.use("/api/", limiter);
 
-// Health check endpoint
-app.get("/health", (req, res) => {
+// ✅ Updated Health Check Endpoint
+app.get("/api/health", (req, res) => {
   res.status(200).json({
     status: "ok",
     environment: process.env.NODE_ENV || "development",
@@ -64,19 +59,17 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Serve static files from the root dist folder
+// Serve static files from the `dist` folder
 const distPath = join(__dirname, "..", "dist");
 app.use(express.static(distPath));
 
 // Initialize OpenAI API client
 let openai;
 try {
-  openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-  console.log("OpenAI client initialized.");
+  openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  console.log("✅ OpenAI client initialized.");
 } catch (error) {
-  console.error("Error initializing OpenAI client:", error.message);
+  console.error("❌ Error initializing OpenAI client:", error.message);
 }
 
 // Function to fetch YouTube results if API key is available
@@ -108,7 +101,7 @@ async function getYouTubeResults(query) {
       url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
     }));
   } catch (error) {
-    console.error("YouTube API Error:", error.message);
+    console.error("❌ YouTube API Error:", error.message);
     return [];
   }
 }
@@ -119,7 +112,6 @@ async function getWebResults(query) {
     const response = await axios.get(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json`
     );
-
     const results = response.data.RelatedTopics || [];
     return results
       .filter((topic) => topic.FirstURL && topic.Text)
@@ -130,7 +122,7 @@ async function getWebResults(query) {
         url: topic.FirstURL,
       }));
   } catch (error) {
-    console.error("Web Search Error:", error.message);
+    console.error("❌ Web Search Error:", error.message);
     return [];
   }
 }
@@ -179,10 +171,10 @@ app.post("/api/generate", async (req, res) => {
       webResults: webData,
     });
   } catch (error) {
-    console.error("Error processing request:", error.message);
-    res.status(500).json({
-      error: "Failed to process request. Please try again later.",
-    });
+    console.error("❌ Error processing request:", error.message);
+    res
+      .status(500)
+      .json({ error: "Failed to process request. Please try again later." });
   }
 });
 
@@ -191,16 +183,16 @@ app.get("*", (req, res) => {
   res.sendFile(join(__dirname, "..", "dist", "index.html"));
 });
 
-// Start the server
-const PORT = process.env.PORT || 8080;
-const server = app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+// ✅ Fixed: Use the correct port for Azure
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Server is running on port ${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(
-    `OpenAI API Key: ${process.env.OPENAI_API_KEY ? "Set" : "Not set"}`
+    `🔑 OpenAI API Key: ${process.env.OPENAI_API_KEY ? "Set" : "Not set"}`
   );
   console.log(
-    `YouTube integration: ${
+    `📺 YouTube API Key: ${
       process.env.YOUTUBE_API_KEY ? "Enabled" : "Disabled"
     }`
   );
@@ -208,9 +200,9 @@ const server = app.listen(PORT, () => {
 
 // Handle server shutdown gracefully
 process.on("SIGTERM", () => {
-  console.log("SIGTERM received. Shutting down gracefully...");
+  console.log("⚠️ SIGTERM received. Shutting down gracefully...");
   server.close(() => {
-    console.log("Server closed");
+    console.log("✅ Server closed");
     process.exit(0);
   });
 });
