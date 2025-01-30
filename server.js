@@ -4,7 +4,7 @@
  */
 
 import express from "express";
-import { join, dirname } from "path";
+import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import bodyParser from "body-parser";
 import cors from "cors";
@@ -15,13 +15,13 @@ import morgan from "morgan";
 import dotenv from "dotenv";
 import path from "path";
 
-// Configure __dirname equivalent for ES modules
+// ✅ Configure __dirname equivalent for ES modules
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Load environment variables (ensures `.env` file is read correctly)
+// ✅ Load environment variables correctly
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
-// Validate required environment variables
+// ✅ Validate required environment variables
 if (!process.env.OPENAI_API_KEY) {
   console.error("❌ Error: OPENAI_API_KEY is not set.");
   process.exit(1);
@@ -35,22 +35,20 @@ if (!process.env.YOUTUBE_API_KEY) {
 
 const app = express();
 
-// Middleware
+// ✅ Middleware Setup
 app.use(cors());
 app.use(bodyParser.json());
-app.use(
-  morgan(":method :url :status :response-time ms - :res[content-length]")
-);
+app.use(morgan("dev"));
 
-// Rate limiting
+// ✅ Rate Limiting for API Protection
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
 });
 app.use("/api/", limiter);
 
-// ✅ Updated Health Check Endpoint
-app.get("/api/health", (req, res) => {
+// ✅ Fixed Health Check Endpoint
+app.get("/health", (req, res) => {
   res.status(200).json({
     status: "ok",
     environment: process.env.NODE_ENV || "development",
@@ -59,11 +57,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Serve static files from the `dist` folder
-const distPath = join(__dirname, "..", "dist");
-app.use(express.static(distPath));
-
-// Initialize OpenAI API client
+// ✅ Initialize OpenAI API client
 let openai;
 try {
   openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -72,7 +66,7 @@ try {
   console.error("❌ Error initializing OpenAI client:", error.message);
 }
 
-// Function to fetch YouTube results if API key is available
+// ✅ Function to fetch YouTube results if API key is available
 async function getYouTubeResults(query) {
   if (!process.env.YOUTUBE_API_KEY) {
     console.log("YouTube API key not found, skipping video results");
@@ -106,7 +100,7 @@ async function getYouTubeResults(query) {
   }
 }
 
-// Function to get relevant web results using DuckDuckGo
+// ✅ Function to get relevant web results using DuckDuckGo
 async function getWebResults(query) {
   try {
     const response = await axios.get(
@@ -127,7 +121,7 @@ async function getWebResults(query) {
   }
 }
 
-// API route to handle OpenAI requests with enhanced results
+// ✅ API Route to Handle OpenAI Requests
 app.post("/api/generate", async (req, res) => {
   if (!openai) {
     return res.status(503).json({
@@ -138,12 +132,10 @@ app.post("/api/generate", async (req, res) => {
 
   try {
     const { prompt } = req.body;
-
     if (!prompt) {
       return res.status(400).json({ error: "Prompt is required" });
     }
 
-    // Execute all searches in parallel with error resilience
     const [aiResponse, youtubeResults, webResults] = await Promise.allSettled([
       openai.chat.completions.create({
         model: "gpt-4",
@@ -178,12 +170,15 @@ app.post("/api/generate", async (req, res) => {
   }
 });
 
-// Serve index.html for all other routes (SPA support)
+// ✅ Serve Static Frontend (Optional, Remove if Unneeded)
+const distPath = join(__dirname, "..", "dist");
+app.use(express.static(distPath));
+
 app.get("*", (req, res) => {
-  res.sendFile(join(__dirname, "..", "dist", "index.html"));
+  res.sendFile(join(distPath, "index.html"));
 });
 
-// ✅ Fixed: Use the correct port for Azure
+// ✅ Final Fix: Ensure Correct Port is Used for Azure
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server is running on port ${PORT}`);
@@ -198,7 +193,7 @@ const server = app.listen(PORT, "0.0.0.0", () => {
   );
 });
 
-// Handle server shutdown gracefully
+// ✅ Handle Server Shutdown Gracefully
 process.on("SIGTERM", () => {
   console.log("⚠️ SIGTERM received. Shutting down gracefully...");
   server.close(() => {
